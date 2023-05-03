@@ -1,0 +1,95 @@
+print_help() {
+    cat <<EOF
+scratch - A tool to quickly scratch project in your favorite language.
+USAGE:
+  scratch [OPTION...] TEMPLATE TARGET
+
+TEMPLATE: Name of the template to use.
+
+TARGET: Target directory where the template will be instantiated.
+
+OPTIONS:
+  --debug                       enable debug logs
+  -h, --help                    print help menu
+  -y, --yes                     use default value of every options
+EOF
+}
+
+skip_options=""
+while [ "$#" -gt "0" ]; do
+  case "$1" in
+    --debug)
+      set -x
+      shift
+      ;;
+
+    --help|-h)
+      print_help
+      exit 0
+      ;;
+
+    --yes|-y)
+      skip_options="y"
+      shift
+      ;;
+
+    --)
+      shift
+      break
+      ;;
+
+    -*)
+      echo "unknown option: $1" >&2
+      exit 1
+      ;;
+
+    *)
+      break
+      ;;
+  esac
+done
+
+case "$#" in
+  0)
+    echo "TEMPLATE and TARGET arguments are missing" >&2
+    exit 1
+    ;;
+
+  1)
+    echo "TEMPLATE or TARGET argument is missing" >&2
+    exit 1
+    ;;
+  2)
+    ;;
+
+  *)
+    echo "was expecting 2 arguments, got $#" >&2
+    exit 1
+    ;;
+esac
+
+template="$1"
+target="$2"
+
+mkdir -p "$target"
+
+# Handle template options
+json_options=$(nix eval --json "templates#templates.$template.envVars" || echo '{}')
+for entry in $(jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | .[]' <<< "$json_options"); do
+  key=$(cut -d '=' -f 1 <<< "$entry")
+  value=$(cut -d '=' -f 2 <<< "$entry")
+
+  if [ "$skip_options" != "y" ]; then
+    read -rp "$key ($value): " opt
+  fi
+  declare -gx "$key=${opt:-$value}"
+done
+
+# Create project
+nix flake new --template "templates#$template" "$target"
+
+# Substitute environment variables
+while IFS= read -r -d '' f; do
+  envsubst -i "$f" -o "$f"
+done < <(find "$target" -type f -print0)
+
