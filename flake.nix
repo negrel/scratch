@@ -15,6 +15,11 @@
             lib = pkgs.lib;
           in
           {
+            devShells = {
+              default = pkgs.mkShell {
+                buildInputs = with pkgs; [ coreutils envsubst ];
+              };
+            };
             packages = {
               default =
                 pkgs.writeShellApplication {
