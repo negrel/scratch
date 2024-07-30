@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 print_help() {
     cat <<EOF
 scratch - A tool to quickly scratch project in your favorite language.
